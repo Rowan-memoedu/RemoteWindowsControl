@@ -9,6 +9,8 @@ $env:PYTHONIOENCODING = 'utf-8'
 $env:PYTHONNOUSERSITE = '1'
 $env:ANONYMIZED_TELEMETRY = 'false'
 $env:WINDOWS_MCP_WATCHDOG = 'off'
+$env:WINDOWS_MCP_TOOLS = $null
+$env:WINDOWS_MCP_EXCLUDE_TOOLS = $null
 
 function Get-TailscaleExe {
     $command = Get-Command tailscale.exe -ErrorAction SilentlyContinue
@@ -121,10 +123,10 @@ try {
     if ($rule) {
         $rule | Set-NetFirewallRule -Enabled True -Direction Inbound -Action Allow -Profile Any
         $rule | Get-NetFirewallAddressFilter | Set-NetFirewallAddressFilter -LocalAddress $ip -RemoteAddress $config.teacherIP
-        $rule | Get-NetFirewallPortFilter | Set-NetFirewallPortFilter -Protocol TCP -LocalPort $config.port
-        $rule | Get-NetFirewallApplicationFilter | Set-NetFirewallApplicationFilter -Program $python
+        $rule | Get-NetFirewallPortFilter | Set-NetFirewallPortFilter -Protocol Any -LocalPort Any -RemotePort Any
+        $rule | Get-NetFirewallApplicationFilter | Set-NetFirewallApplicationFilter -Program Any
     } else {
-        New-NetFirewallRule -Name $ruleName -DisplayName '教师远程协助（仅配对教师）' -Direction Inbound -Action Allow -Enabled True -Profile Any -LocalAddress $ip -RemoteAddress $config.teacherIP -Protocol TCP -LocalPort $config.port -Program $python | Out-Null
+        New-NetFirewallRule -Name $ruleName -DisplayName '教师远程协助（仅配对教师）' -Direction Inbound -Action Allow -Enabled True -Profile Any -LocalAddress $ip -RemoteAddress $config.teacherIP -Protocol Any -Program Any | Out-Null
     }
     $env:WINDOWS_MCP_AUTH_KEY = $config.mcpToken
     $env:WINDOWS_MCP_IP_ALLOWLIST = $config.teacherIP + '/32'
@@ -132,10 +134,8 @@ try {
     New-Item -ItemType Directory -Path $tempPath -Force | Out-Null
     $env:TEMP = $tempPath; $env:TMP = $tempPath
     $configFile = Join-Path $root 'windows-mcp.toml'
-    [IO.File]::WriteAllText($configFile,"# Dedicated remote assistance session`n",[Text.UTF8Encoding]::new($false))
-    . (Join-Path $PSScriptRoot 'ProcessLifetime.ps1')
-    Set-SessionProcessLifetime
-    $arguments = '-m windows_mcp serve --config "{0}" --transport streamable-http --stateless-http --host {1} --port {2}' -f $configFile,$ip,$config.port
+    [IO.File]::WriteAllText($configFile,"[tools]`nexclude = []`n",[Text.UTF8Encoding]::new($false))
+    $arguments = '"{0}" {1} serve --config "{2}" --transport streamable-http --stateless-http --host {3} --port {4}' -f (Join-Path $PSScriptRoot 'SessionServer.py'),$PID,$configFile,$ip,$config.port
     $server = Start-Process -FilePath $python -ArgumentList $arguments -NoNewWindow -PassThru
     $ready = $false
     for ($attempt=0; $attempt -lt 60; $attempt++) {

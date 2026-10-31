@@ -16,13 +16,17 @@
 
 学生无需 Google、Tailscale 或 OpenAI 账号，不安装 Codex。当前发行包支持 Windows 10/11 AMD64。Python 和全部依赖随包提供，联网只用于 Tailscale 接入及后续任务。
 
-Windows-MCP 在交互桌面的管理员会话中运行，提供文件、PowerShell、进程、注册表和桌面工具。程序只绑定 Tailscale IPv4，使用每台设备独立的 Bearer Token，并同时限制 Windows 防火墙和 MCP 来源地址。关闭窗口会通过 Windows Job Object 结束该窗口的服务和子进程；不会自动启动、修改 UAC 策略或替换既有 Tailscale 身份。
+Windows-MCP 在交互桌面的管理员会话中运行，开启全部工具：文件、PowerShell、进程、注册表和桌面工具。没有额外的命令、目录或软件白名单；启动器清除继承的工具排除设置，避免环境变量意外减少权限。Codex 单次工具等待时间为 3600 秒，长 PowerShell 命令需同时传入合适的 `timeout`，后台任务可按正常 Windows 方式启动。
+
+程序只绑定 Tailscale IPv4，使用每台设备独立的 Bearer Token，并同时限制 Windows 防火墙和 MCP 来源地址。教师到学生的全部端口和 IP 协议均放行，支持访问学生电脑上另行启动的网站或其他服务；这些连接身份校验不缩小教师的操作权限。关闭窗口只结束远程控制服务，不额外强制结束已启动的应用和后台任务；不会自动启动、修改 UAC 策略或替换既有 Tailscale 身份。
 
 Tailscale 网络服务使用 Windows 的 `--unattended=true` 模式，避免没有托盘程序时出现 `NoState`；这只维持网络连接，Windows-MCP 仍须学生主动打开窗口，关闭窗口后不再提供远程操作。
 
 ## 教师配置
 
-教师本机首先登录 Tailscale。网络策略必须显式设置空 `acls`，且唯一网络 grant 为教师 Tailscale IPv4 → `tag:codex-student` 的 `tcp:8765`。标签由管理员管理。已存在其他设备或策略时先检查原有用途，不直接覆盖。
+教师本机首先登录 Tailscale。网络策略必须显式设置空 `acls`，且唯一网络 grant 为教师 Tailscale IPv4 → `tag:codex-student` 的 `*`（全部端口与 IP 协议）。标签由管理员管理。学生主动访问教师或其他学生的方向没有授权。已存在其他设备或策略时先检查原有用途，不直接覆盖。
+
+当前 Personal 免费计划包含 50 个带标签的资源，因此本方案可免费接入 50 台学生电脑；教师本机使用用户身份，不占这 50 个名额。每台学生电脑需使用独立安装包。超过免费额度后，官方价格为每个额外带标签资源 1 美元/月。Personal 适用于非商业用途，收费教学或机构用途需按官方适用范围选择计划。
 
 为每台学生电脑创建单次、非临时、预授权、仅含 `tag:codex-student` 的 Auth Key。接入码有效期只限制首次加入，不会自动撤销已经加入的设备。正式结束设备管理时在 Tailscale 控制台撤销对应设备。
 
@@ -37,7 +41,7 @@ Tailscale 网络服务使用 Windows 的 `--unattended=true` 模式，避免没�
 - `tests/smoke_runtime.py`：解压至新位置后实际启动 HTTP MCP；验证 Bearer 认证、来源地址限制、工具列表与真实 PowerShell 命令。
 - `tests/test_config.py`：保留现有 Codex 配置、重复执行、名称冲突拒绝和启用更新。
 - `tests/Test-Student.ps1`：Windows PowerShell 5.1 语法及来源地址校验。
-- `tests/lifetime_canary.py`：结束父进程后其子进程被回收。
+- `tests/lifetime_canary.py`：关闭启动器后控制服务停止，已启动的独立后台进程继续运行。
 
 安装失败会显示具体错误，不把仅完成下载或组件解压称为已接通。远端整机安装、UAC 和跨网络连通需要第一台学生电脑的实际验收。
 
@@ -45,6 +49,7 @@ Tailscale 网络服务使用 Windows 的 `--unattended=true` 模式，避免没�
 
 - https://tailscale.com/docs/install/windows/msi
 - https://tailscale.com/docs/features/access-control/auth-keys
+- https://tailscale.com/pricing
 - https://github.com/CursorTouch/Windows-MCP/tree/v0.8.8
 - https://docs.astral.sh/uv/concepts/python-versions/
 - https://github.com/openai/codex/blob/main/codex-rs/core/config.schema.json

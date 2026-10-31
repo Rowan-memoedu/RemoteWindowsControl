@@ -18,7 +18,7 @@ with zipfile.ZipFile(archive) as bundle:
     assert len(roots)==1
     root=next(iter(roots))
     read=lambda name: bundle.read(root+'/'+name)
-    required={'Start.cmd','Start.ps1','ProcessLifetime.ps1','说明.txt','pairing.json','assets/assets.json','assets/runtime.zip','assets/tailscale.msi'}
+    required={'Start.cmd','Start.ps1','SessionServer.py','说明.txt','pairing.json','assets/assets.json','assets/runtime.zip','assets/tailscale.msi'}
     actual={name[len(root)+1:] for name in names if not name.endswith('/')}
     assert actual==required,actual
     pairing=json.loads(read('pairing.json').decode('utf-8-sig'))
@@ -26,7 +26,7 @@ with zipfile.ZipFile(archive) as bundle:
     assert pairing['authKey'].startswith('tskey-auth-')
     assert len(pairing['mcpToken'])==64
     assert pairing['teacherIP'].startswith('100.')
-    for name in ('Start.ps1','ProcessLifetime.ps1','说明.txt','pairing.json'):
+    for name in ('Start.ps1','说明.txt','pairing.json'):
         assert read(name).startswith(b'\xef\xbb\xbf'),f'Windows encoding: {name}'
     for name in actual-{'assets/runtime.zip','assets/tailscale.msi'}:
         assert b'tskey-api-' not in read(name),f'Unexpected API credential in {name}'

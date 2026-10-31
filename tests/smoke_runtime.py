@@ -10,6 +10,8 @@ import sys
 import time
 import urllib.error
 import urllib.request
+sys.path.insert(0,str(Path(__file__).parents[1]))
+from mcp_http import read_response
 
 root = Path(sys.argv[1]).resolve()
 out = Path(sys.argv[2]).resolve()
@@ -35,10 +37,7 @@ def call(port, method, params=None, auth=token):
     req = urllib.request.Request(f'http://127.0.0.1:{port}/mcp', payload, headers)
     try:
         with urllib.request.urlopen(req, timeout=50) as response:
-            raw = response.read().decode()
-            if raw.startswith('event:') or raw.startswith('data:'):
-                raw = next(line[6:] for line in raw.splitlines() if line.startswith('data: '))
-            return response.status, json.loads(raw)
+            return response.status, read_response(response,progress=lambda:print('MCP keepalive: '+method,flush=True))
     except urllib.error.HTTPError as exc:
         return exc.code, {}
 
@@ -91,6 +90,7 @@ try:
             raise AssertionError('Desktop remained under user control; command test was not completed')
         report['powershell'] = 'PASS: authenticated command returned expected output'
         for method, arguments in [('Screenshot',{}),('Snapshot',{'use_vision':False,'use_dom':False,'use_ui_tree':True})]:
+            print('Checking read-only '+method+'...',flush=True)
             for _ in range(12):
                 status,result=call(port,'tools/call',{'name':method,'arguments':arguments})
                 result_text=json.dumps(result)

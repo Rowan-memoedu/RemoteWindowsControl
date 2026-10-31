@@ -9,6 +9,7 @@ import subprocess
 import tempfile
 import tomllib
 import urllib.request
+from mcp_http import read_response
 
 def update_config(path: Path, pairing: dict, url: str, enabled: bool):
     host = pairing['hostName']
@@ -23,7 +24,7 @@ def update_config(path: Path, pairing: dict, url: str, enabled: bool):
     begin = f'# RemoteWindowsAssist begin {host}'
     end = f'# RemoteWindowsAssist end {host}'
     block = '\n'.join([begin, f'[mcp_servers.{name}]', f'url = {json.dumps(url)}',
-        f'enabled = {str(enabled).lower()}', 'startup_timeout_sec = 30', 'tool_timeout_sec = 600',
+        f'enabled = {str(enabled).lower()}', 'startup_timeout_sec = 60', 'tool_timeout_sec = 3600',
         'http_headers = { Authorization = ' + json.dumps('Bearer ' + token) + ' }', end])
     if begin in before:
         if before.count(begin) != 1 or before.count(end) != 1:
@@ -86,10 +87,7 @@ def main():
         payload = json.dumps({'jsonrpc':'2.0','id':1,'method':'initialize','params':{'protocolVersion':'2025-11-25','capabilities':{},'clientInfo':{'name':'teacher-connection-check','version':'1'}}}).encode()
         request = urllib.request.Request(url,payload,{'Content-Type':'application/json','Accept':'application/json, text/event-stream','Authorization':'Bearer '+pairing['mcpToken']})
         with urllib.request.urlopen(request,timeout=30) as response:
-            raw=response.read().decode()
-            if raw.startswith(('data:','event:')):
-                raw=next(line[6:] for line in raw.splitlines() if line.startswith('data: '))
-            if 'result' not in json.loads(raw):
+            if 'result' not in read_response(response):
                 raise RuntimeError('MCP initialize handshake failed')
     name = update_config(args.codex_config, pairing, url, args.connect)
     print(json.dumps({'server':name,'enabled':args.connect,'verified_connection':args.connect}, ensure_ascii=False))

@@ -4,6 +4,9 @@ from pathlib import Path
 import tempfile
 import tomllib
 import unittest
+import sys
+sys.path.insert(0,str(Path(__file__).parents[1]))
+from mcp_http import decode_response
 
 spec=importlib.util.spec_from_file_location('configure_codex',Path(__file__).parents[1]/'configure_codex.py')
 module=importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
@@ -41,5 +44,8 @@ class ConfigTests(unittest.TestCase):
         self.pair['hostName']='../../invalid'
         with self.assertRaises(ValueError): module.update_config(self.path,self.pair,'http://localhost',False)
         self.assertEqual(self.before,self.path.read_text(encoding='utf-8'))
+    def test_sse_heartbeat_before_result(self):
+        body=': ping - keepalive\r\n\r\nevent: message\r\ndata: {"jsonrpc":"2.0",\r\ndata: "id":1,"result":{"ok":true}}\r\n\r\n'
+        self.assertTrue(decode_response(body,'text/event-stream')['result']['ok'])
 
 if __name__=='__main__': unittest.main()

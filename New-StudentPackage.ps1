@@ -27,7 +27,7 @@ try {
     if ($policy -is [string]) { $policy = $policy | ConvertFrom-Json }
 } finally { $apiToken = $null }
 $grants = @($policy.grants)
-if (@($policy.acls).Count -ne 0 -or $grants.Count -ne 1 -or @($grants[0].src).Count -ne 1 -or $grants[0].src[0] -ne $teacherIP -or @($grants[0].dst).Count -ne 1 -or $grants[0].dst[0] -ne 'tag:codex-student' -or @($grants[0].ip).Count -ne 1 -or $grants[0].ip[0] -ne 'tcp:8765') { throw '网络隔离策略不符合仅教师访问学生协助端口的配置，已停止打包。请先核验现有网络，脚本不会覆盖策略。' }
+if (@($policy.acls).Count -ne 0 -or $grants.Count -ne 1 -or @($grants[0].src).Count -ne 1 -or $grants[0].src[0] -ne $teacherIP -or @($grants[0].dst).Count -ne 1 -or $grants[0].dst[0] -ne 'tag:codex-student' -or @($grants[0].ip).Count -ne 1 -or $grants[0].ip[0] -ne '*') { throw '网络策略不符合教师访问学生全部端口和协议的配置，已停止打包。请先核验现有网络，脚本不会覆盖策略。' }
 New-Item -ItemType Directory -Path $StateRoot,$OutputRoot -Force | Out-Null
 foreach ($privateFolder in @($StateRoot,$OutputRoot)) {
     $acl = [Security.AccessControl.DirectorySecurity]::new()
