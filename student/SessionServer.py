@@ -1,4 +1,4 @@
-"""Stop this MCP server when its visible launcher closes; leave launched apps alone."""
+"""Stop MCP when its task/session supervisor exits; leave launched apps alone."""
 import os
 import sys
 import threading

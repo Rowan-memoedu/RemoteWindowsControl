@@ -18,3 +18,5 @@ runtime/
 private/
 pairing.json
 config.local.json
+resident.json
+resident-state.json

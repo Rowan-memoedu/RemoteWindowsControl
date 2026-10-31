@@ -2,7 +2,7 @@
 
 教师电脑通过 Tailscale 和 Windows-MCP 操作学生的 Windows 电脑。学生电脑不安装 Codex。
 
-学生主动启动协助窗口，结束后停止 Windows-MCP。接入密钥、配对配置、运行日志和交付包保存在仓库之外，不提交到 GitHub。
+学生首次配置一次，此后登录安装时的 Windows 账户会自动上线。接入密钥、配对配置、运行日志和交付包保存在仓库之外，不提交到 GitHub。
 
 源码：D:\Projects\RemoteWindowsControl
 
@@ -12,15 +12,21 @@
 
 ## 学生使用
 
-完整解压 ZIP，双击 `Start.cmd`，确认管理员提示。窗口显示“已启动，等待老师连接”后保留窗口，电脑保持解锁。结束时关闭窗口。默认交付通用包，同一个 ZIP 可以发给不同学生。
+完整解压 ZIP，双击 `Start.cmd`，确认管理员提示。窗口显示“配置完成，已自动上线”后即可关闭，后续无需再次运行安装包或逐次确认连接。默认交付通用包，同一个 ZIP 可以发给不同学生。旧版用户先关闭原协助窗口，运行更新后的包一次，原设备编号与配对凭据不变。
+
+学生通过桌面“远程协助设置”停止或恢复自动连接。停止会同时停用登录触发任务、结束控制服务并关闭原协助防火墙规则；恢复会重新启用。仅关闭安装窗口不再中断协助。程序文件复制到本机固定目录，后续运行不依赖下载文件夹或解压包。
 
 学生无需 Google、Tailscale 或 OpenAI 账号，不安装 Codex。当前发行包支持 Windows 10/11 AMD64。Python 和全部依赖随包提供，联网只用于 Tailscale 接入及后续任务。
 
 Windows-MCP 在交互桌面的管理员会话中运行，开启全部工具：文件、PowerShell、进程、注册表和桌面工具。没有额外的命令、目录或软件白名单；启动器清除继承的工具排除设置，避免环境变量意外减少权限。Codex 单次工具等待时间为 3600 秒，长 PowerShell 命令需同时传入合适的 `timeout`，后台任务可按正常 Windows 方式启动。
 
-程序只绑定 Tailscale IPv4，使用每台设备独立的 Bearer Token，并同时限制 Windows 防火墙和 MCP 来源地址。通用包首次运行会随机生成设备编号，保存在当前 Windows 用户的本机状态中，重复启动和重新解压保持相同身份；教师按设备名派生对应凭据，无需学生回传密钥。教师到学生的全部端口和 IP 协议均放行，支持访问学生电脑上另行启动的网站或其他服务；这些连接身份校验不缩小教师的操作权限。关闭窗口只结束远程控制服务，不额外强制结束已启动的应用和后台任务；不会自动启动、修改 UAC 策略或替换既有 Tailscale 身份。
+程序只绑定 Tailscale IPv4，使用每台设备独立的 Bearer Token，并同时限制 Windows 防火墙和 MCP 来源地址。通用包首次运行会随机生成设备编号，保存在当前 Windows 用户的本机状态中，重复启动和重新解压保持相同身份；教师按设备名派生对应凭据，无需学生回传密钥。教师到学生的全部端口和 IP 协议均放行，支持访问学生电脑上另行启动的网站或其他服务；这些连接身份校验不缩小教师的操作权限。不修改 UAC 策略、Windows 自动登录设置或既有 Tailscale 身份。
 
-Tailscale 网络服务使用 Windows 的 `--unattended=true` 模式，避免没有托盘程序时出现 `NoState`；这只维持网络连接，Windows-MCP 仍须学生主动打开窗口，关闭窗口后不再提供远程操作。
+Tailscale 使用自动启动服务和 `--unattended=true` 模式。Windows-MCP 使用 Windows 原生计划任务，在安装者登录后延迟 15 秒启动；任务采用 `Interactive` 登录类型和 `Highest` 权限，始终处于实际桌面会话而非 Session 0。没有执行时长上限，使用电池时继续运行。同一任务附带每分钟重复触发，已在运行时忽略，异常停止后自动补启；不依赖单独的 RestartOnFailure 属性。网络尚未就绪时后台等待正确的 Tailscale 配置。初次管理员授权后，后续登录启动不需要重复 UAC。
+
+本方案保证的使用条件是：电脑已开机、登录安装时的 Windows 账户、联网且未休眠；截图和桌面操作需要解锁。尚未登录 Windows 时只有 Tailscale 网络层可用，不将 Windows-MCP 放入 SYSTEM 服务，也不绕过登录或安全桌面。安装必须在具有管理员权限的日常账户中完成；如果标准账户在 UAC 中输入另一个管理员账户，会明确拒绝，避免任务绑定到错误账户。
+
+新设备优先安装到 `D:\AppData\RemoteWindowsAssist\<设备编号>`；无可用 D 盘时使用当前用户 LocalAppData。已有设备沿用原运行目录，避免复制运行时和破坏身份。持久化配置只保存该设备的 MCP 凭据，不复制 Tailscale 接入码或通用包配对秘密。桌面“远程协助设置”是取消自动启动的恢复入口，停用后可随时重新启用。
 
 ## 教师配置
 
@@ -45,12 +51,15 @@ Tailscale 网络服务使用 Windows 的 `--unattended=true` 模式，避免没�
 - `tests/Test-Student.ps1`：Windows PowerShell 5.1 语法及来源地址校验。
 - `tests/lifetime_canary.py`：关闭启动器后控制服务停止，已启动的独立后台进程继续运行。
 - `tests/test_universal.py` 和 `tests/Test-UniversalPairing.ps1`：两台模拟电脑的独立身份、重复启动、接入码更新、旧包兼容、损坏状态拒绝、PowerShell/Python 凭据一致性、设备发现及多 MCP 配置保留。
+- `tests/persistence_canary.py`：实际注册临时登录计划任务，验证交互会话、认证 MCP、服务崩溃自动恢复、停止和恢复；不注销或重启正在使用的电脑。本机未提升时以 Limited 运行测试并单独校验生产 Highest 定义，不能把此测试当作学生机管理员权限或完整重启验收。
 
-安装失败会显示具体错误，不把仅完成下载或组件解压称为已接通。远端整机安装、UAC 和跨网络连通需要第一台学生电脑的实际验收。
+安装失败会显示具体错误，不把仅完成下载或组件解压称为已接通。原交互版已在第一台学生电脑验证跨网络管理员 PowerShell、截图与安装软件。常驻版的学生机登录自启动仍需在线后实际验收。
 
 ## 官方来源
 
 - https://tailscale.com/docs/install/windows/msi
+- https://tailscale.com/docs/how-to/run-unattended
+- https://learn.microsoft.com/en-us/windows/win32/taskschd/security-contexts-for-running-tasks
 - https://tailscale.com/docs/features/access-control/auth-keys
 - https://tailscale.com/pricing
 - https://github.com/CursorTouch/Windows-MCP/tree/v0.8.8

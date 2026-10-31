@@ -19,7 +19,7 @@ with zipfile.ZipFile(archive) as bundle:
     assert len(roots)==1
     root=next(iter(roots))
     read=lambda name: bundle.read(root+'/'+name)
-    required={'Start.cmd','Start.ps1','SessionServer.py','说明.txt','pairing.json','assets/assets.json','assets/runtime.zip','assets/tailscale.msi'}
+    required={'Start.cmd','Start.ps1','SessionServer.py','Persistence.ps1','Resident.ps1','Manage-Assist.ps1','说明.txt','pairing.json','assets/assets.json','assets/runtime.zip','assets/tailscale.msi'}
     actual={name[len(root)+1:] for name in names if not name.endswith('/')}
     pairing=json.loads(read('pairing.json').decode('utf-8-sig'))
     if pairing['schema']==2:
@@ -50,6 +50,6 @@ with zipfile.ZipFile(archive) as bundle:
         assert 'python.exe' in inner.namelist()
         assert 'Lib/site-packages/windows_mcp/__main__.py' in inner.namelist()
         assert all('..' not in PurePosixPath(p).parts for p in inner.namelist())
-report={'status':'PASS','archive':str(archive),'bytes':archive.stat().st_size,'sha256':hashlib.sha256(archive.read_bytes()).hexdigest(),'packageMode':pairing.get('mode','single-device'),'packageIdentity':pairing.get('fleetId',root),'enrollmentExpires':pairing['enrollmentExpires'],'checks':['ZIP integrity','complete manifest','Windows PowerShell UTF-8 BOM','pinned binary hashes','no teacher API credential','portable runtime included'],'remote_end_to_end':'pending first student execution'}
+report={'status':'PASS','archive':str(archive),'bytes':archive.stat().st_size,'sha256':hashlib.sha256(archive.read_bytes()).hexdigest(),'packageMode':pairing.get('mode','single-device'),'connectionMode':'automatic-at-logon','packageIdentity':pairing.get('fleetId',root),'enrollmentExpires':pairing['enrollmentExpires'],'checks':['ZIP integrity','complete persistent-runner manifest','Windows PowerShell UTF-8 BOM','pinned binary hashes','no teacher API credential','portable runtime included'],'remote_end_to_end':'persistent upgrade pending student execution; original interactive connection already verified separately'}
 output.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
 print(json.dumps({key:value for key,value in report.items() if key not in {'archive','sha256'}},ensure_ascii=False))
