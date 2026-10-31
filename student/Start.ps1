@@ -95,11 +95,11 @@ try {
         $keyFile = Join-Path $root 'enrollment.key'
         try {
             [IO.File]::WriteAllText($keyFile,$config.authKey,[Text.UTF8Encoding]::new($false))
-            $acl = Get-Acl -LiteralPath $keyFile
+            $acl = [Security.AccessControl.FileSecurity]::new()
             $acl.SetAccessRuleProtection($true,$false)
             $acl.SetAccessRule([Security.AccessControl.FileSystemAccessRule]::new($identity.User,'FullControl','Allow'))
-            Set-Acl -LiteralPath $keyFile -AclObject $acl
-            & $tailscale up ('--auth-key=file:' + $keyFile) ('--hostname=' + $config.hostName) --accept-routes=false --accept-dns=false --timeout=60s
+            [IO.File]::SetAccessControl($keyFile,$acl)
+            & $tailscale up ('--auth-key=file:' + $keyFile) ('--hostname=' + $config.hostName) --accept-routes=false --accept-dns=false --unattended=true --timeout=60s
             if ($LASTEXITCODE -ne 0) { throw '自动接入失败；请确认能上网，若重复失败请联系老师。' }
         } finally {
             if (Test-Path -LiteralPath $keyFile) { Remove-Item -LiteralPath $keyFile -Force }

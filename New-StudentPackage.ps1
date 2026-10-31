@@ -30,12 +30,12 @@ $grants = @($policy.grants)
 if (@($policy.acls).Count -ne 0 -or $grants.Count -ne 1 -or @($grants[0].src).Count -ne 1 -or $grants[0].src[0] -ne $teacherIP -or @($grants[0].dst).Count -ne 1 -or $grants[0].dst[0] -ne 'tag:codex-student' -or @($grants[0].ip).Count -ne 1 -or $grants[0].ip[0] -ne 'tcp:8765') { throw '网络隔离策略不符合仅教师访问学生协助端口的配置，已停止打包。请先核验现有网络，脚本不会覆盖策略。' }
 New-Item -ItemType Directory -Path $StateRoot,$OutputRoot -Force | Out-Null
 foreach ($privateFolder in @($StateRoot,$OutputRoot)) {
-    $acl = Get-Acl -LiteralPath $privateFolder
+    $acl = [Security.AccessControl.DirectorySecurity]::new()
     $acl.SetAccessRuleProtection($true,$false)
     foreach($sid in @([Security.Principal.WindowsIdentity]::GetCurrent().User,[Security.Principal.SecurityIdentifier]::new('S-1-5-18'),[Security.Principal.SecurityIdentifier]::new('S-1-5-32-544'))) {
         $acl.SetAccessRule([Security.AccessControl.FileSystemAccessRule]::new($sid,'FullControl','ContainerInherit,ObjectInherit','None','Allow'))
     }
-    Set-Acl -LiteralPath $privateFolder -AclObject $acl
+    [IO.FileSystemAclExtensions]::SetAccessControl([IO.DirectoryInfo]::new($privateFolder),$acl)
 }
 # Enrollment keys are single use; prevent accidentally preparing two devices with one key.
 $keyDigest = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($key.key))).ToLowerInvariant()
@@ -60,7 +60,7 @@ $pairing | ConvertTo-Json | Set-Content -LiteralPath $pairingPath -Encoding utf8
 $teacherPairing = Join-Path $StateRoot ($hostName + '.json')
 $pairing.Remove('authKey')
 $pairing | ConvertTo-Json | Set-Content -LiteralPath $teacherPairing -Encoding utf8
-$python = 'D:\Artifacts\RemoteWindowsControl\build\managed-python\cpython-3.14.10-windows-x86_64-none\python.exe'
+$python = (Get-Command python.exe -ErrorAction Stop).Source
 & $python (Join-Path $PSScriptRoot 'configure_codex.py') $teacherPairing
 if ($LASTEXITCODE -ne 0) { throw '教师 Codex MCP 配置失败。' }
 $zip = Join-Path $OutputRoot ($hostName + '-学生远程协助.zip')

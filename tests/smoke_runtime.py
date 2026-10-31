@@ -1,5 +1,6 @@
 """Check portable MCP startup, authentication, allowlist and real command round trip."""
 import json
+import base64
 import os
 from pathlib import Path
 import secrets
@@ -89,6 +90,25 @@ try:
         else:
             raise AssertionError('Desktop remained under user control; command test was not completed')
         report['powershell'] = 'PASS: authenticated command returned expected output'
+        for method, arguments in [('Screenshot',{}),('Snapshot',{'use_vision':False,'use_dom':False,'use_ui_tree':True})]:
+            for _ in range(12):
+                status,result=call(port,'tools/call',{'name':method,'arguments':arguments})
+                result_text=json.dumps(result)
+                if 'USER_CONTROL' in result_text or 'TAKEOVER_PENDING' in result_text:
+                    time.sleep(2); continue
+                assert status==200 and not result.get('result',{}).get('isError',False),method+' failed'
+                content=result.get('result',{}).get('content',[])
+                if method=='Screenshot':
+                    images=[part for part in content if part.get('type')=='image']
+                    assert images and len(base64.b64decode(images[0]['data']))>1000,'Screenshot missing'
+                    report['screenshot']='PASS: read-only screenshot returned image data; no screenshot saved'
+                else:
+                    blocks=[part.get('text','') for part in content if part.get('type')=='text']
+                    assert blocks and not any('Error capturing' in text for text in blocks),'Snapshot failed'
+                    report['snapshot']='PASS: read-only desktop snapshot returned; private UI content not logged'
+                break
+            else:
+                raise AssertionError(method+' not completed because the user retained control')
         process.terminate(); process.wait(timeout=15); process=None
     with (out/'denied.log').open('w',encoding='utf-8') as log:
         port=free_port()

@@ -18,6 +18,8 @@
 
 Windows-MCP 在交互桌面的管理员会话中运行，提供文件、PowerShell、进程、注册表和桌面工具。程序只绑定 Tailscale IPv4，使用每台设备独立的 Bearer Token，并同时限制 Windows 防火墙和 MCP 来源地址。关闭窗口会通过 Windows Job Object 结束该窗口的服务和子进程；不会自动启动、修改 UAC 策略或替换既有 Tailscale 身份。
 
+Tailscale 网络服务使用 Windows 的 `--unattended=true` 模式，避免没有托盘程序时出现 `NoState`；这只维持网络连接，Windows-MCP 仍须学生主动打开窗口，关闭窗口后不再提供远程操作。
+
 ## 教师配置
 
 教师本机首先登录 Tailscale。网络策略必须显式设置空 `acls`，且唯一网络 grant 为教师 Tailscale IPv4 → `tag:codex-student` 的 `tcp:8765`。标签由管理员管理。已存在其他设备或策略时先检查原有用途，不直接覆盖。
