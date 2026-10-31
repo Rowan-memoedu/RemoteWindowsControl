@@ -13,7 +13,7 @@ from mcp_http import read_response
 
 def update_config(path: Path, pairing: dict, url: str, enabled: bool):
     host = pairing['hostName']
-    if not re.fullmatch(r'rwc-[a-f0-9]{12}', host):
+    if not re.fullmatch(r'(?:rwc-[a-f0-9]{12}|rwg-[a-f0-9]{8}-[a-f0-9]{12})', host):
         raise ValueError('Invalid assistance hostname')
     token = pairing['mcpToken']
     if not re.fullmatch(r'[a-f0-9]{64}', token):

@@ -11,6 +11,7 @@ $env:ANONYMIZED_TELEMETRY = 'false'
 $env:WINDOWS_MCP_WATCHDOG = 'off'
 $env:WINDOWS_MCP_TOOLS = $null
 $env:WINDOWS_MCP_EXCLUDE_TOOLS = $null
+. (Join-Path $PSScriptRoot 'Pairing.ps1')
 
 function Get-TailscaleExe {
     $command = Get-Command tailscale.exe -ErrorAction SilentlyContinue
@@ -36,7 +37,7 @@ try {
     $configPath = Join-Path $PSScriptRoot 'pairing.json'
     if (-not (Test-Path -LiteralPath $configPath)) { throw '安装包缺少教师配对配置，请联系老师重新生成。' }
     $config = Get-Content -LiteralPath $configPath -Raw -Encoding UTF8 | ConvertFrom-Json
-    if ($config.schema -ne 1 -or $config.hostName -notmatch '^rwc-[a-f0-9]{12}$' -or $config.mcpToken -notmatch '^[a-f0-9]{64}$' -or $config.port -ne 8765) { throw '配对配置格式无效。' }
+    if ($config.schema -notin @(1,2) -or $config.port -ne 8765) { throw '配对配置格式无效。' }
     Assert-TailIP $config.teacherIP
     if (-not $config.tailnetName -or -not $config.dnsSuffix) { throw '配对配置尚未完成。' }
     if (-not [Environment]::Is64BitOperatingSystem -or $env:PROCESSOR_ARCHITECTURE -ne 'AMD64' -or $env:PROCESSOR_ARCHITEW6432) { throw '此安装包仅支持 64 位 Intel/AMD Windows，请联系老师。' }
@@ -55,6 +56,7 @@ try {
     $Host.UI.RawUI.WindowTitle = '远程协助 — 关闭此窗口结束控制'
     Write-Host '运行期间，老师可查看屏幕、操作电脑、读写文件和执行安装命令。' -ForegroundColor Yellow
     Write-Host '关闭本窗口即可结束本次协助。请保持电脑不锁屏、不休眠。'
+    $config = Resolve-StudentPairing $config (Join-Path $env:LOCALAPPDATA 'RemoteWindowsAssist\identities')
 
     $assets = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'assets\assets.json') -Raw -Encoding UTF8 | ConvertFrom-Json
     $runtimeZip = Join-Path $PSScriptRoot 'assets\runtime.zip'
@@ -91,8 +93,8 @@ try {
     if ($status.CurrentTailnet -and $status.CurrentTailnet.Name -ne $config.tailnetName) { throw '此电脑已加入其他 Tailscale 网络，脚本不会替换现有连接，请联系老师。' }
     if ($status.CurrentTailnet -and $status.Self.HostName -ne $config.hostName) { throw '此电脑已有其他 Tailscale 身份，脚本不会改名或覆盖，请联系老师。' }
     if (-not $status.CurrentTailnet) {
-        if ((Get-Date).ToUniversalTime() -ge [DateTime]::Parse($config.enrollmentExpires).ToUniversalTime()) { throw '一次性接入码已过期，请老师重新生成安装包。' }
-        if ($config.authKey -notmatch '^tskey-auth-[A-Za-z0-9-]+$') { throw '一次性接入码缺失或无效。' }
+        if ((Get-Date).ToUniversalTime() -ge [DateTime]::Parse($config.enrollmentExpires).ToUniversalTime()) { throw '接入码已过期，请向老师索取更新后的安装包。' }
+        if ($config.authKey -notmatch '^tskey-auth-[A-Za-z0-9-]+$') { throw '接入码缺失或无效。' }
         Write-Host '正在自动接入，无需注册或登录账号……'
         $keyFile = Join-Path $root 'enrollment.key'
         try {

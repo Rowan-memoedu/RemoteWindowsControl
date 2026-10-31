@@ -2,6 +2,7 @@
 import io
 import hashlib
 import json
+import re
 from pathlib import Path, PurePosixPath
 import sys
 import zipfile
@@ -20,13 +21,23 @@ with zipfile.ZipFile(archive) as bundle:
     read=lambda name: bundle.read(root+'/'+name)
     required={'Start.cmd','Start.ps1','SessionServer.py','说明.txt','pairing.json','assets/assets.json','assets/runtime.zip','assets/tailscale.msi'}
     actual={name[len(root)+1:] for name in names if not name.endswith('/')}
-    assert actual==required,actual
     pairing=json.loads(read('pairing.json').decode('utf-8-sig'))
-    assert pairing['hostName']==root
+    if pairing['schema']==2:
+        required.add('Pairing.ps1')
+        assert pairing['mode']=='universal'
+        assert re.fullmatch(r'[a-f0-9]{8}',pairing['fleetId'])
+        assert re.fullmatch(r'[a-f0-9]{64}',pairing['mcpSecret'])
+        assert 'hostName' not in pairing and 'mcpToken' not in pairing
+    else:
+        assert pairing['schema']==1
+        assert pairing['hostName']==root
+        assert len(pairing['mcpToken'])==64
+        if 'Pairing.ps1' in actual:
+            required.add('Pairing.ps1')
+    assert actual==required,actual
     assert pairing['authKey'].startswith('tskey-auth-')
-    assert len(pairing['mcpToken'])==64
     assert pairing['teacherIP'].startswith('100.')
-    for name in ('Start.ps1','说明.txt','pairing.json'):
+    for name in [n for n in actual if n.endswith(('.ps1','.txt'))]+['pairing.json']:
         assert read(name).startswith(b'\xef\xbb\xbf'),f'Windows encoding: {name}'
     for name in actual-{'assets/runtime.zip','assets/tailscale.msi'}:
         assert b'tskey-api-' not in read(name),f'Unexpected API credential in {name}'
@@ -39,6 +50,6 @@ with zipfile.ZipFile(archive) as bundle:
         assert 'python.exe' in inner.namelist()
         assert 'Lib/site-packages/windows_mcp/__main__.py' in inner.namelist()
         assert all('..' not in PurePosixPath(p).parts for p in inner.namelist())
-report={'status':'PASS','archive':str(archive),'bytes':archive.stat().st_size,'sha256':hashlib.sha256(archive.read_bytes()).hexdigest(),'hostName':root,'enrollmentExpires':pairing['enrollmentExpires'],'checks':['ZIP integrity','complete manifest','Windows PowerShell UTF-8 BOM','pinned binary hashes','no teacher API credential','portable runtime included'],'remote_end_to_end':'pending first student execution'}
+report={'status':'PASS','archive':str(archive),'bytes':archive.stat().st_size,'sha256':hashlib.sha256(archive.read_bytes()).hexdigest(),'packageMode':pairing.get('mode','single-device'),'packageIdentity':pairing.get('fleetId',root),'enrollmentExpires':pairing['enrollmentExpires'],'checks':['ZIP integrity','complete manifest','Windows PowerShell UTF-8 BOM','pinned binary hashes','no teacher API credential','portable runtime included'],'remote_end_to_end':'pending first student execution'}
 output.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
 print(json.dumps({key:value for key,value in report.items() if key not in {'archive','sha256'}},ensure_ascii=False))
