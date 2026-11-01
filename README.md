@@ -24,6 +24,10 @@ Windows-MCP 在交互桌面的管理员会话中运行，开启全部工具：�
 
 Tailscale 使用自动启动服务和 `--unattended=true` 模式。Windows-MCP 使用 Windows 原生计划任务，在安装者登录后延迟 15 秒启动；任务采用 `Interactive` 登录类型和 `Highest` 权限，始终处于实际桌面会话而非 Session 0。没有执行时长上限，使用电池时继续运行。同一任务附带每分钟重复触发，已在运行时忽略，异常停止后自动补启；不依赖单独的 RestartOnFailure 属性。网络尚未就绪时后台等待正确的 Tailscale 配置。初次管理员授权后，后续登录启动不需要重复 UAC。
 
+计划任务直接使用 `pythonw.exe` 无控制台入口，通过 `CREATE_NO_WINDOW` 启动后台管理脚本，避免 PowerShell 启动时先出现控制台再隐藏。Windows-MCP 原生 PowerShell 执行器已经使用无窗口进程；本地启动适配还让 `App.launch_executable` 启动命令行程序时不分配控制台，GUI 软件的正常窗口不受此标志影响。安装向导、软件本身的窗口、权限提示和学生主动打开的“远程协助设置”正常显示。
+
+教师执行后台辅助任务时使用 PowerShell 工具；其中另行调用 `Start-Process` 启动命令行助手或安装器时显式使用 `-WindowStyle Hidden`，有官方静默安装参数时优先使用。需要显示软件界面时使用 App 工具或显式 `-WindowStyle Normal`。不通过终端窗口输入命令，不修改学生系统的全局控制台设置。
+
 本方案保证的使用条件是：电脑已开机、登录安装时的 Windows 账户、联网且未休眠；截图和桌面操作需要解锁。尚未登录 Windows 时只有 Tailscale 网络层可用，不将 Windows-MCP 放入 SYSTEM 服务，也不绕过登录或安全桌面。安装必须在具有管理员权限的日常账户中完成；如果标准账户在 UAC 中输入另一个管理员账户，会明确拒绝，避免任务绑定到错误账户。
 
 新设备优先安装到 `D:\AppData\RemoteWindowsAssist\<设备编号>`；无可用 D 盘时使用当前用户 LocalAppData。已有设备沿用原运行目录，避免复制运行时和破坏身份。持久化配置只保存该设备的 MCP 凭据，不复制 Tailscale 接入码或通用包配对秘密。桌面“远程协助设置”是取消自动启动的恢复入口，停用后可随时重新启用。
@@ -52,6 +56,8 @@ Tailscale 使用自动启动服务和 `--unattended=true` 模式。Windows-MCP �
 - `tests/lifetime_canary.py`：关闭启动器后控制服务停止，已启动的独立后台进程继续运行。
 - `tests/test_universal.py` 和 `tests/Test-UniversalPairing.ps1`：两台模拟电脑的独立身份、重复启动、接入码更新、旧包兼容、损坏状态拒绝、PowerShell/Python 凭据一致性、设备发现及多 MCP 配置保留。
 - `tests/persistence_canary.py`：实际注册临时登录计划任务，验证交互会话、认证 MCP、服务崩溃自动恢复、停止和恢复；不注销或重启正在使用的电脑。本机未提升时以 Limited 运行测试并单独校验生产 Highest 定义，不能把此测试当作学生机管理员权限或完整重启验收。
+- `tests/quiet_runtime_canary.py`：通过实际 App 启动实现读取 Win32 控制台句柄与窗口可见性，确认命令行无控制台、GUI 可正常显示，并验证等待网络时停止启动器不会遗留管理进程；无需操作用户桌面。
+- `tests/quiet_nested_command.py`：验证真实 PowerShell 执行器调用 CMD，以及显式隐藏启动的后台助手没有可见控制台。
 
 安装失败会显示具体错误，不把仅完成下载或组件解压称为已接通。原交互版已在第一台学生电脑验证跨网络管理员 PowerShell、截图与安装软件。常驻版的学生机登录自启动仍需在线后实际验收。
 

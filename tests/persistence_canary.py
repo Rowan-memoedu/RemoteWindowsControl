@@ -106,7 +106,7 @@ try:
     with socket.socket() as probe:
         probe.bind((ip, 0))
         port = probe.getsockname()[1]
-    for name in ('Resident.ps1','Persistence.ps1','SessionServer.py'):
+    for name in ('Resident.ps1','Persistence.ps1','SessionServer.py','QuietLauncher.py','QuietConsole.py'):
         text = (SOURCE/'student'/name).read_text(encoding='utf-8-sig')
         (out/name).write_text(text,encoding='utf-8-sig' if name.endswith('.ps1') else 'utf-8')
     config = {'schema':1,'hostName':context['hostName'],'teacherIP':ip,
@@ -115,7 +115,8 @@ try:
         'userSid':context['sid'],'pythonExe':str(runtime/'python.exe'),'taskName':task_name}
     (out/'resident.json').write_text(json.dumps(config),encoding='utf-8-sig')
     register = '. ' + quote(out/'Persistence.ps1') + '; '
-    register += '$definition=New-AssistTaskDefinition ' + ' '.join(quote(p) for p in (context['sid'],out/'Resident.ps1',out/'resident.json',out)) + '; '
+    register += '$definition=New-AssistTaskDefinition ' + ' '.join(quote(p) for p in (context['sid'],out/'QuietLauncher.py',out/'resident.json',out,runtime/'pythonw.exe')) + '; '
+    register += "if([IO.Path]::GetFileName($definition.Actions[0].Execute) -ne 'pythonw.exe'){throw 'Scheduled entry point is not windowless'}; "
     register += "if($definition.Principal.RunLevel -ne 'Highest' -or $definition.Principal.LogonType -ne 'Interactive'){throw 'Production principal mismatch'}; "
     register += "if($definition.Settings.ExecutionTimeLimit -ne 'PT0S' -or $definition.Settings.RestartCount -ne 999 -or $definition.Triggers[0].Delay -ne 'PT15S' -or $definition.Triggers[1].Repetition.Interval -ne 'PT1M'){throw 'Task recovery/logon settings mismatch'}; "
     if not context['admin']:
@@ -123,7 +124,7 @@ try:
     register += 'Register-ScheduledTask -TaskName ' + quote(task_name) + ' -InputObject $definition | Out-Null'
     ps(register)
     registered = True
-    report['productionDefinition'] = 'Highest + InteractiveToken + logon trigger + unlimited execution + native 1-minute repeating recovery trigger'
+    report['productionDefinition'] = 'windowless pythonw + Highest + InteractiveToken + logon trigger + unlimited execution + native 1-minute repeating recovery trigger'
     report['actualCanaryRunLevel'] = 'Highest' if context['admin'] else 'Limited'
     report['fullRebootTest'] = 'Not performed; actual logon trigger remains for student acceptance'
     task_action('Start-ScheduledTask')
@@ -155,9 +156,28 @@ try:
     report['resume'] = 'PASS'
     report['status'] = 'PASS'
     try:
-        result = guarded('PowerShell', {'command':"Write-Output 'PERSISTENT_COMMAND_OK'",'timeout':20})
+        command = "Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class QuietConsoleProbe { [DllImport(\"kernel32.dll\")] public static extern IntPtr GetConsoleWindow(); }'; "
+        command += "Write-Output ('QUIET_CONSOLE=' + [QuietConsoleProbe]::GetConsoleWindow().ToInt64()); & $env:ComSpec /d /c echo PERSISTENT_COMMAND_OK"
+        result = guarded('PowerShell', {'command':command,'timeout':25})
         assert 'PERSISTENT_COMMAND_OK' in json.dumps(result) and 'Status Code: 0' in json.dumps(result)
+        assert 'QUIET_CONSOLE=0' in json.dumps(result), 'PowerShell allocated a console window'
         report['powershell'] = 'PASS'
+        report['quietPowerShellAndCmd'] = 'PASS: console handle is zero; nested CMD returned output'
+        probe = SOURCE/'tests'/'console_probe.py'
+        for executable, label, extra in [('python.exe','console',[]),('pythonw.exe','gui',['--gui'])]:
+            output = out/(task_name+'-'+label+'.json')
+            guarded('App', {'mode':'launch_executable','executable':str(runtime/executable),'args':[str(probe),str(output),*extra]})
+            for _ in range(50):
+                if output.exists():
+                    observation=json.loads(output.read_text(encoding='utf-8'))
+                    break
+                time.sleep(.1)
+            else:
+                raise AssertionError('App launch probe did not return its observation')
+            assert observation['consoleHandle'] == 0 and not observation['consoleVisible'], 'App launch allocated a console window'
+            if label == 'gui':
+                assert observation['guiVisible'], 'App launch suppressed a normal GUI window'
+        report['quietAppLaunch'] = 'PASS: CLI executable has no console; GUI window visibility preserved'
         result = guarded('Screenshot', {})
         images = [x for x in result['result']['content'] if x.get('type') == 'image']
         assert images and len(base64.b64decode(images[0]['data'])) > 1000

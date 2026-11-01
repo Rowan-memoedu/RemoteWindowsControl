@@ -37,9 +37,10 @@ function Protect-AssistRoot([string]$Root) {
     [IO.Directory]::SetAccessControl($Root,$acl)
 }
 
-function New-AssistTaskDefinition([string]$UserSid,[string]$ScriptPath,[string]$ConfigPath,[string]$WorkingDirectory) {
-    $executable = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-    $arguments = '-NoLogo -NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -File "{0}" -ConfigPath "{1}"' -f $ScriptPath,$ConfigPath
+function New-AssistTaskDefinition([string]$UserSid,[string]$ScriptPath,[string]$ConfigPath,[string]$WorkingDirectory,[string]$PythonwExe) {
+    if (-not $PythonwExe -or -not (Test-Path -LiteralPath $PythonwExe)) { throw '缺少无控制台运行组件 pythonw.exe。' }
+    $executable = $PythonwExe
+    $arguments = '"{0}" "{1}"' -f $ScriptPath,$ConfigPath
     $action = New-ScheduledTaskAction -Execute $executable -Argument $arguments -WorkingDirectory $WorkingDirectory
     $principal = New-ScheduledTaskPrincipal -UserId $UserSid -LogonType Interactive -RunLevel Highest
     $trigger = New-ScheduledTaskTrigger -AtLogOn -User $UserSid
@@ -56,9 +57,10 @@ function Install-AssistPersistence([object]$Pairing,[string]$Root,[string]$Tails
     $taskName = 'RemoteWindowsAssist-' + $Pairing.hostName
     $existing = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
     $resident = Join-Path $Root 'Resident.ps1'
+    $launcher = Join-Path $Root 'QuietLauncher.py'
     $configPath = Join-Path $Root 'resident.json'
     if ($existing) {
-        if (@($existing.Actions).Count -ne 1 -or $existing.Actions[0].Arguments -notlike ('*"' + $resident + '"*')) { throw '同名计划任务不属于此安装，已停止以免覆盖。' }
+        if (@($existing.Actions).Count -ne 1 -or ($existing.Actions[0].Arguments -notlike ('*"' + $resident + '"*') -and $existing.Actions[0].Arguments -notlike ('*"' + $launcher + '"*'))) { throw '同名计划任务不属于此安装，已停止以免覆盖。' }
         Disable-ScheduledTask -InputObject $existing | Out-Null
         Stop-ScheduledTask -InputObject $existing
         for ($i=0; $i -lt 15; $i++) {
@@ -68,7 +70,7 @@ function Install-AssistPersistence([object]$Pairing,[string]$Root,[string]$Tails
     }
     if (Get-NetTCPConnection -State Listen -LocalPort $Pairing.port -ErrorAction SilentlyContinue) { throw '检测到原有协助窗口或其他程序仍占用端口。请关闭旧版协助窗口后，再双击此版本的 Start.cmd。' }
     Protect-AssistRoot $Root
-    foreach ($name in @('Resident.ps1','SessionServer.py','Manage-Assist.ps1')) {
+    foreach ($name in @('Resident.ps1','SessionServer.py','QuietLauncher.py','QuietConsole.py','Manage-Assist.ps1')) {
         $source = Join-Path $SourceRoot $name
         $destination = Join-Path $Root $name
         if ([IO.Path]::GetFullPath($source) -ne [IO.Path]::GetFullPath($destination)) { Copy-Item -LiteralPath $source -Destination $destination -Force }
@@ -81,7 +83,7 @@ function Install-AssistPersistence([object]$Pairing,[string]$Root,[string]$Tails
         pythonExe=(Join-Path $Root 'runtime\python.exe'); taskName=$taskName
     }
     [IO.File]::WriteAllText($configPath,($configuration | ConvertTo-Json),[Text.UTF8Encoding]::new($true))
-    $definition = New-AssistTaskDefinition $userSid $resident $configPath $Root
+    $definition = New-AssistTaskDefinition $userSid $launcher $configPath $Root (Join-Path $Root 'runtime\pythonw.exe')
     Register-ScheduledTask -TaskName $taskName -InputObject $definition -Force | Out-Null
     $readback = Get-ScheduledTask -TaskName $taskName
     if ($readback.Principal.LogonType -ne 'Interactive' -or $readback.Principal.RunLevel -ne 'Highest') { throw '自动启动任务未保留交互桌面或管理员权限。' }
