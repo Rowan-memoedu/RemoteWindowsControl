@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f6f8fb">
+  <title>学生电脑 · 设备状态</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/tokens.css">
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+<header class="masthead">
+  <div class="masthead-inner">
+    <div class="brand">
+      <svg class="brand-mark" aria-hidden="true" viewBox="0 0 40 40" fill="none"><rect x="5.5" y="6.5" width="28" height="21" rx="3"/><path d="M13 33h14m-7-5v5"/><path class="signal" d="M10 18h4l3-6 4 11 3-6h5"/></svg>
+      <h1>学生电脑</h1>
+    </div>
+    <div class="header-tools">
+      <span id="clock" class="subtle" aria-live="off"></span>
+      <button id="refresh" class="refresh" type="button"><svg aria-hidden="true" viewBox="0 0 20 20" fill="none"><path d="M15.3 7.2a6 6 0 1 0 .6 4.5M15.7 3.7v4.1h-4.1"/></svg>刷新</button>
+    </div>
+  </div>
+</header>
+<main class="workspace">
+  <aside class="roster">
+    <div class="section-head"><h2>设备列表</h2><span id="total" class="small-number">—</span></div>
+    <nav id="devices" aria-label="选择学生电脑"></nav>
+    <p id="counts" class="subtle"></p>
+  </aside>
+  <section class="workspace-detail" aria-label="所选电脑">
+    <p id="warning" class="warning" role="status" hidden></p>
+    <div id="profile"><p class="empty">正在读取设备状态…</p></div>
+  </section>
+</main>
+<footer><span class="footer-mark"></span>每 15 秒检查连接<span class="footer-separator">/</span>北京时间</footer>
+</body>
+</html>

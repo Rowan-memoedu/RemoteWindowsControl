@@ -1,0 +1,20 @@
+:root {
+  color-scheme: light;
+  --color-page: #f5f7fa;
+  --color-paper: #ffffff;
+  --color-ink: #182733;
+  --color-body: #334653;
+  --color-muted: #586974;
+  --color-rule: #d8e0e5;
+  --color-track: #e8edf1;
+  --color-blue: #1859a7;
+  --color-blue-wash: #e9f1fa;
+  --color-green: #196044;
+  --color-green-wash: #e4f2e9;
+  --color-off: #775426;
+  --color-off-wash: #f8efdc;
+  --font-body: "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+  --font-data: "Cascadia Mono", Consolas, var(--font-body);
+  --radius-control: 6px;
+  --radius-surface: 12px;
+}
