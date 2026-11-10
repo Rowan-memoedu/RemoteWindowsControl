@@ -2,7 +2,6 @@
 
 协作开发、Agent 提交与合并规则见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-
 教师电脑通过 Tailscale 和 Windows-MCP 操作学生的 Windows 电脑。学生电脑不安装 Codex。
 
 学生首次配置一次，此后登录安装时的 Windows 账户会自动上线。接入密钥、配对配置、运行日志和交付包保存在仓库之外，不提交到 GitHub。
